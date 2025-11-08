@@ -1,0 +1,64 @@
+#include <esp_now.h>
+#include <WiFi.h>
+
+uint8_t receiverAddress[] = {0xAA, 0xBB, 0xCC, 0xDD, 0xEE, 0xFF}; //AA, BB, CC, DD, EE, FF -> Mac ID of the receiving ESP32
+String outgoingMessage = "";
+
+void onSent(const wifi_tx_info_t *info, esp_now_send_status_t status) {
+  Serial.print("Send status: ");
+  if (status == ESP_NOW_SEND_SUCCESS) {
+    Serial.println("Delivered successfully");
+  } else {
+    Serial.println("Delivery failed (no ACK)");
+  }
+}
+
+void setup() {
+  Serial.begin(115200);
+  WiFi.mode(WIFI_STA);
+
+  if (esp_now_init() != ESP_OK) {
+    Serial.println("Error initializing ESP-NOW");
+    return;
+  }
+
+  esp_now_register_send_cb(onSent);
+
+  esp_now_peer_info_t peerInfo = {};
+  memcpy(peerInfo.peer_addr, receiverAddress, 6);
+  peerInfo.channel = 1;  // Fixed channel (use same on receiver)
+  peerInfo.encrypt = false;
+
+  if (esp_now_add_peer(&peerInfo) != ESP_OK) {
+    Serial.println("Failed to add peer");
+    return;
+  }
+
+  Serial.println("ESP-NOW Sender ready!");
+  Serial.println("Type a message and press ENTER to send:");
+}
+
+void loop() {
+  if (Serial.available()) {
+    outgoingMessage = Serial.readStringUntil('\n');
+    outgoingMessage.trim();
+
+    if (outgoingMessage.length() == 0) return;
+    if (outgoingMessage.length() > 250) {
+      Serial.println("Message too long! (max 250 bytes)");
+      return;
+    }
+
+    esp_err_t result = esp_now_send(receiverAddress,
+                                    (uint8_t *)outgoingMessage.c_str(),
+                                    outgoingMessage.length() + 1);
+    if (result == ESP_OK) {
+      Serial.print("Sent: ");
+      Serial.println(outgoingMessage);
+    } else {
+      Serial.println("Send failed to start!");
+    }
+
+    delay(50); // brief cooldown to prevent flooding
+  }
+}
