@@ -1,0 +1,33 @@
+#include <WiFi.h>
+#include <esp_now.h>
+
+int ledPin = 2;  // onboard LED (GPIO2), use GPIO 4 to be safe
+
+void onDataReceived(const uint8_t *mac, const uint8_t *incomingData, int len) {
+  Serial.print("Received message: ");
+  Serial.println((char *)incomingData);
+
+  // Blink LED to show successful reception
+  digitalWrite(ledPin, HIGH);
+  delay(100);
+  digitalWrite(ledPin, LOW);
+}
+
+void setup() {
+  Serial.begin(115200);
+  WiFi.mode(WIFI_STA);
+
+  pinMode(ledPin, OUTPUT);
+  digitalWrite(ledPin, LOW);
+
+  if (esp_now_init() != ESP_OK) {
+    Serial.println("Error initializing ESP-NOW");
+    return;
+  }
+
+  esp_now_register_recv_cb(onDataReceived);
+}
+
+void loop() {
+  // Nothing needed here
+}
